@@ -1,0 +1,11 @@
+{
+  "domain": "pip_notifications",
+  "name": "HA PiP Notifications",
+  "version": "0.1.0",
+  "documentation": "https://github.com/Tom-Neverwinter/ha-pip-notifications",
+  "dependencies": ["camera"],
+  "after_dependencies": ["ai_task", "media_source"],
+  "codeowners": ["@Tom-Neverwinter"],
+  "iot_class": "local_push",
+  "requirements": []
+}

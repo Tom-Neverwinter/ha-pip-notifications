@@ -1,0 +1,34 @@
+#!/bin/sh
+# Refuse commits that look like they contain secrets. Enable: git config core.hooksPath .githooks
+# ponytail: regex screen, not a full scanner; add gitleaks if this ever goes multi-contributor.
+fail=0
+files=$(git diff --cached --name-only --diff-filter=ACMR)
+
+for f in $files; do
+  case "$f" in
+    *.example.*) ;;
+    *secret*|*token*|*.jks|*.keystore|*.p12|*.pem|*.key|.env*)
+      echo "pre-commit: refusing secret-looking file: $f"; fail=1 ;;
+  esac
+done
+
+# Only added lines; skip the hook itself (it contains the patterns).
+added=$(git diff --cached -U0 -- . ':(exclude).githooks' | grep '^+' | grep -v '^+++')
+check() {
+  hits=$(printf '%s\n' "$added" | grep -nE "$1")
+  if [ -n "$hits" ]; then echo "pre-commit: $2:"; printf '%s\n' "$hits" | head -5; fail=1; fi
+}
+check 'Bearer [A-Za-z0-9._~+/=-]{16,}'                                  "bearer token"
+check '(token|secret|password|api_?key)[^:=]{0,20}[:=] *"?[A-Za-z0-9._~+/=-]{20,}' "credential value"
+check '\b(10|127)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\b|\b192\.168\.[0-9]{1,3}\.[0-9]{1,3}\b|\b172\.(1[6-9]|2[0-9]|3[01])\.[0-9]{1,3}\.[0-9]{1,3}\b' "private IP"
+check 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}'                       "JWT"
+check 'BEGIN [A-Z ]*PRIVATE KEY'                                         "private key"
+
+# Exact match against known local token files, if present (never committed themselves).
+for t in "$HAPIP_TOKEN_FILE" ../.pip_notifications_token ../.ha_token; do
+  if [ -z "$t" ] || [ ! -f "$t" ]; then continue; fi
+  v=$(tr -d '\r\n' < "$t")
+  [ -n "$v" ] && printf '%s\n' "$added" | grep -qF "$v" && { echo "pre-commit: contains the real token from $t"; fail=1; }
+done
+
+[ $fail -eq 0 ] || { echo "Commit blocked. Remove the secret (or use a *.example.* placeholder)."; exit 1; }

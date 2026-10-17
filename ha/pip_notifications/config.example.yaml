@@ -1,0 +1,5 @@
+# Copy to /config/pip_notifications/config.yaml and add to configuration.yaml:
+#   pip_notifications: !include pip_notifications/config.yaml
+token: !secret pip_notifications_token   # resolved from /config/pip_notifications/secrets.yaml
+tvs:
+  living_room: 192.0.2.10          # TV IP (192.0.2.x = documentation placeholder)

@@ -1,0 +1,14 @@
+# Build output
+android/build/
+
+# Secrets: only *.example.* templates belong in the repo
+secrets.yaml
+*secret*
+!*.example.yaml
+*token*
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+.env*
