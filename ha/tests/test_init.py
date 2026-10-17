@@ -55,10 +55,18 @@ def ai_service(hass, handler):
     )
 
 
-async def test_short_token_rejected(hass: HomeAssistant):
+async def test_short_token_rejected(hass: HomeAssistant, caplog):
     assert not await async_setup_component(
         hass, DOMAIN, {DOMAIN: {"token": "short", "tvs": {"a": "192.0.2.1"}}}
     )
+    # Must fail on the token length, not because the integration wasn't found.
+    assert "Integration not found" not in caplog.text
+    assert "Invalid config for 'pip_notifications'" in caplog.text
+    assert not hass.services.has_service(DOMAIN, "show")
+
+
+async def test_valid_config_registers_service(hass: HomeAssistant, setup):
+    assert hass.services.has_service(DOMAIN, "show")
 
 
 async def test_delivers_to_all_tvs(hass, setup, aioclient_mock):
