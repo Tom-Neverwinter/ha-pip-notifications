@@ -21,8 +21,15 @@ mapfile -t CLS < <(find build/classes -name '*.class')
 (cd build/dex && "$PY" -c "import zipfile;z=zipfile.ZipFile('../unsigned.apk','a');z.write('classes.dex');z.close()")
 "$BT/zipalign$EXE" -f -p 4 build/unsigned.apk build/aligned.apk
 
-# ponytail: Android debug keystore is fine for a sideloaded home app; keep it, updates need the same key.
-[ -f "$KS" ] || keytool -genkeypair -keystore "$KS" -storepass android -keypass android -alias androiddebugkey \
-  -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
-"$BT/apksigner$BAT" sign --ks "$KS" --ks-pass pass:android --out build/ha-pip-notifications.apk build/aligned.apk
+# Default: your Android debug key (fine for your own TVs; created if missing).
+# Releases: HAPIP_KEYSTORE=<release keystore> HAPIP_KS_PASS_FILE=<file holding its password>.
+KS_PASS="pass:android"
+if [ -n "${HAPIP_KS_PASS_FILE:-}" ]; then
+  [ -f "$KS" ] || { echo "release keystore $KS not found" >&2; exit 1; }
+  KS_PASS="file:$HAPIP_KS_PASS_FILE"   # never on the command line
+elif [ ! -f "$KS" ]; then
+  keytool -genkeypair -keystore "$KS" -storepass android -keypass android -alias androiddebugkey \
+    -dname "CN=Android Debug,O=Android,C=US" -keyalg RSA -keysize 2048 -validity 10000
+fi
+"$BT/apksigner$BAT" sign --ks "$KS" --ks-pass "$KS_PASS" --out build/ha-pip-notifications.apk build/aligned.apk
 "$BT/apksigner$BAT" verify build/ha-pip-notifications.apk && ls -l build/ha-pip-notifications.apk

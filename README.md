@@ -82,21 +82,33 @@ Optional in `config.yaml`: `time_format: "%H:%M:%S · %a %d %b"` for 24-hour tim
 `3:05:51 PM · Sat Oct 17`).
 
 ### TV app
-Build it (needs JDK 17 and Android SDK build-tools 35 + platform 35; no Gradle):
+**Download** `ha-pip-notifications-<version>.apk` from [Releases](https://github.com/Tom-Neverwinter/ha-pip-notifications/releases)
+and check it before installing — the SHA-256 is in the release notes, and every release is signed with
+the same project key:
+```bash
+sha256sum ha-pip-notifications-<version>.apk
+apksigner verify --print-certs ha-pip-notifications-<version>.apk | grep SHA-256
+# Signer certificate SHA-256 must be:
+# 643366e1adff7ee1b20e17b39692e6468def7dbda48fd9df1059e375db86acea
+```
+**Or build it yourself** (JDK 17, Android SDK build-tools 35 + platform 35; no Gradle). A self-built
+APK is signed with your own debug key — you can't then update it with a release APK (or the other way
+round) without uninstalling first:
 ```bash
 bash android/build.sh        # -> android/build/ha-pip-notifications.apk
 ```
 Install and configure over adb (enable *Developer options → USB/Wireless debugging* on the TV):
 ```bash
-adb -s <tv> install -r android/build/ha-pip-notifications.apk
+adb -s <tv> install -r ha-pip-notifications-<version>.apk
 adb -s <tv> shell appops set io.github.tomneverwinter.hapip SYSTEM_ALERT_WINDOW allow
 adb -s <tv> shell am broadcast -f 32 -n io.github.tomneverwinter.hapip/.ConfigReceiver \
     --es token "<same token>" --es allow <Home Assistant IP>
 ```
 The app has no icon in the launcher; it runs as a small background service and starts again by itself
 after the TV reboots — **this can take several minutes** (Android TV notifies apps one by one after boot;
-~5 min on the tested Google TV), so popups sent right after a reboot are missed. The APK is signed with your
-local Android debug key; updates must use the same key.
+~5 min on the tested Google TV), so popups sent right after a reboot are missed. Its token and allowlist
+survive reboots and updates. Note that Android switches *Wireless debugging* off at every reboot; you only
+need it again to update or reconfigure the app.
 
 ## Use
 ```yaml
@@ -144,8 +156,9 @@ Typical automation: motion/doorbell trigger → `pip_notifications.show` → you
 **Tested** on a real Google TV: malformed/negative/overflowing lengths, oversized headers, garbage and
 random fuzz input (400 requests), slow clients, truncated bodies, invalid images, deeply nested JSON,
 a decompression-bomb PNG, auth edge cases, a 300-connection flood from a non-allow-listed host,
-unicode/RTL/emoji text, and 80 rapid popups (memory returns to baseline). See CI for the automated
-checks.
+unicode/RTL/emoji text, and 80 rapid popups (memory returns to baseline). **Reboot** (`adb reboot`,
+Android 14 Google TV): the app restarted by itself after ~315 s with its configuration intact, and Home
+Assistant delivered a popup with the snapshot. See CI for the automated checks.
 
 ## Development
 - `tests/`: Home Assistant tests using HA's own test harness (Linux only) — the action, and the
