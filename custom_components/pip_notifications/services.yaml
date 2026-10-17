@@ -1,0 +1,61 @@
+show:
+  name: Show camera popup
+  description: >-
+    Take a snapshot from a camera and show it as a small picture-in-picture popup on
+    Android TV / Google TV devices running the HA PiP Notifications app.
+  fields:
+    camera:
+      name: Camera
+      description: Camera entity to take the snapshot from.
+      required: true
+      selector:
+        entity:
+          domain: camera
+    tvs:
+      name: TVs
+      description: TV names from your configuration. Leave empty to send to all TVs.
+      example: living_room
+      selector:
+        text:
+          multiple: true
+    name:
+      name: Title
+      description: Title shown on the popup. Defaults to the camera's name.
+      example: Front door
+      selector:
+        text:
+    location:
+      name: Location
+      description: Optional location shown next to the title.
+      example: Porch
+      selector:
+        text:
+    analysis:
+      name: Analysis text
+      description: Optional text to show under the image (for example from your own AI pipeline).
+      selector:
+        text:
+          multiline: true
+    ai_task_entity:
+      name: AI Task entity
+      description: >-
+        Optional AI Task entity. The popup is shown immediately, then replaced with a version
+        that includes the AI's one-line description of the snapshot.
+      selector:
+        entity:
+          domain: ai_task
+    ai_prompt:
+      name: AI prompt
+      description: Instructions for the AI. The default asks for one short, non-identifying sentence.
+      selector:
+        text:
+          multiline: true
+    duration:
+      name: Duration
+      description: Seconds the popup stays on screen.
+      default: 5
+      selector:
+        number:
+          min: 3
+          max: 120
+          unit_of_measurement: s

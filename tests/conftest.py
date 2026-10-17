@@ -1,4 +1,4 @@
-"""Run from ha/: python -m pytest tests"""
+"""Run from the repo root: python -m pytest tests (Linux; see CI)."""
 
 import pathlib
 

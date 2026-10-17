@@ -3,22 +3,55 @@ name: CI
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # weekly: catch breakage from new Home Assistant releases
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  hassfest:
+    name: hassfest (HA's integration validator)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands # no logo in home-assistant/brands yet
+
+  version:
+    name: Versions in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          python3 - <<'EOF'
+          import json, os, re, sys
+          ha = json.load(open("custom_components/pip_notifications/manifest.json"))["version"]
+          apk = re.search(r'android:versionName="([^"]+)"', open("android/AndroidManifest.xml").read())[1]
+          ref = os.environ.get("GITHUB_REF", "")
+          tag = ref.removeprefix("refs/tags/v") if ref.startswith("refs/tags/v") else None
+          print(f"manifest.json {ha} | AndroidManifest {apk} | tag {tag}")
+          sys.exit(0 if ha == apk and tag in (None, ha) else "Versions out of sync")
+          EOF
+
   ha-tests:
-    name: HA integration tests (Linux, latest HA)
+    name: HA integration tests (latest HA)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - run: uv venv --python 3.14 && uv pip install pytest-homeassistant-custom-component PyTurboJPEG
-      - run: cd ha && ../.venv/bin/python -c "import homeassistant.const as c; print('HA', c.__version__)"
-      - name: Which custom_components does Python see?
-        run: cd ha && ../.venv/bin/python -c "import pytest_homeassistant_custom_component, custom_components as c; print(list(c.__path__))"
-      - run: cd ha && ../.venv/bin/python -m pytest tests -v -p no:cacheprovider
+      - run: .venv/bin/python -c "import homeassistant.const as c; print('HA', c.__version__)"
+      - run: .venv/bin/python -m pytest tests -v -p no:cacheprovider
 
   lint:
     name: ruff, bandit, shellcheck
@@ -26,11 +59,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: uvx ruff@0.7.4 check ha/custom_components
-      - run: uvx ruff@0.7.4 format --check ha/custom_components
+      - run: uvx ruff@0.7.4 check custom_components tests
+      - run: uvx ruff@0.7.4 format --check custom_components tests
       # Python 3.12: bandit crashes on 3.14 ASTs and then *skips the file* with exit 0.
       - run: |
-          out=$(uvx --python 3.12 bandit@1.8.6 -r ha/custom_components); echo "$out"
+          out=$(uvx --python 3.12 bandit@1.8.6 -r custom_components); echo "$out"
           echo "$out" | grep -q 'Files skipped (0)' || { echo 'bandit skipped files'; exit 1; }
       - run: uvx --from shellcheck-py@0.10.0.1 shellcheck android/build.sh .githooks/pre-commit
 
