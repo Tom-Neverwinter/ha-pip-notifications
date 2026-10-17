@@ -18,7 +18,7 @@ jobs:
       - run: cd ha && ../.venv/bin/python -c "import homeassistant.const as c; print('HA', c.__version__)"
       - name: Which custom_components does Python see?
         run: cd ha && ../.venv/bin/python -c "import pytest_homeassistant_custom_component, custom_components as c; print(list(c.__path__))"
-      - run: cd ha && ../.venv/bin/python -m pytest tests -v -p no:cacheprovider -s -k diag
+      - run: cd ha && ../.venv/bin/python -m pytest tests -v -p no:cacheprovider
 
   lint:
     name: ruff, bandit, shellcheck
