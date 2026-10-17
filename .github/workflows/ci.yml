@@ -90,3 +90,39 @@ jobs:
       - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" "platforms;android-35" > /dev/null
       - run: HAPIP_KEYSTORE="$RUNNER_TEMP/ci.keystore" bash android/build.sh
       - run: '"$ANDROID_HOME/build-tools/35.0.0/aapt2" dump permissions android/build/ha-pip-notifications.apk'
+
+  badges:
+    name: Badges from real repo data
+    # Shields.io can't read private repos, so build the badges here from GitHub's own data
+    # (license detection, latest release) and the repo files, and publish them to the
+    # `badges` branch that the README points to.
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          license=$(gh api "repos/$GITHUB_REPOSITORY/license" --jq .license.spdx_id 2>/dev/null || echo "not detected")
+          release=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName 2>/dev/null || echo "none")
+          ha=$(python3 -c "import json; print(json.load(open('hacs.json'))['homeassistant'])")
+          sdk=$(python3 -c "import re; print(re.search(r'minSdkVersion=\"(\d+)\"', open('android/AndroidManifest.xml').read())[1])")
+          android=$(python3 -c "print({26:'8.0',27:'8.1',28:'9',29:'10',30:'11',31:'12',32:'12L',33:'13',34:'14',35:'15'}.get($sdk, 'API $sdk'))")
+          echo "license=$license release=$release ha=$ha android=$android (API $sdk)"
+          esc() { python3 -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1].replace('-', '--').replace('_', '__')))" "$1"; }
+          mkdir -p out
+          badge() { curl -fsSL "https://img.shields.io/badge/$(esc "$2")-$(esc "$3")-$4${5:+?logo=$5&logoColor=white}" -o "out/$1.svg"; }
+          badge license License "$license" "$([ "$license" = "not detected" ] && echo red || echo yellow)"
+          badge release Release "$release" blue
+          badge homeassistant "Home Assistant" "$ha+" 41BDF5 homeassistant
+          badge android "Android TV" "$android+" 3DDC84 android
+          printf '{"license":"%s","release":"%s","homeassistant":"%s","android":"%s","source_commit":"%s"}\n' \
+            "$license" "$release" "$ha" "$android" "$GITHUB_SHA" > out/badges.json
+          cd out && git init -q -b badges && git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Badges for $GITHUB_SHA"
+          git push -f -q "https://x-access-token:${GH_TOKEN}@github.com/$GITHUB_REPOSITORY.git" badges

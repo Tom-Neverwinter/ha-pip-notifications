@@ -1,11 +1,11 @@
 # HA PiP Notifications
 
 [![CI](https://github.com/Tom-Neverwinter/ha-pip-notifications/actions/workflows/ci.yml/badge.svg)](https://github.com/Tom-Neverwinter/ha-pip-notifications/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Tom-Neverwinter/ha-pip-notifications)](https://github.com/Tom-Neverwinter/ha-pip-notifications/releases)
+[![Release](https://github.com/Tom-Neverwinter/ha-pip-notifications/raw/badges/release.svg)](https://github.com/Tom-Neverwinter/ha-pip-notifications/releases)
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/docs/faq/custom_repositories)
-[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2025.8%2B-41BDF5?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
-[![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3DDC84?logo=android&logoColor=white)](#tv-app)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Home Assistant](https://github.com/Tom-Neverwinter/ha-pip-notifications/raw/badges/homeassistant.svg)](https://www.home-assistant.io/)
+[![Android TV](https://github.com/Tom-Neverwinter/ha-pip-notifications/raw/badges/android.svg)](#tv-app)
+[![License](https://github.com/Tom-Neverwinter/ha-pip-notifications/raw/badges/license.svg)](LICENSE)
 
 [![Open your Home Assistant instance and open this repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Tom-Neverwinter&repository=ha-pip-notifications&category=integration)
 
