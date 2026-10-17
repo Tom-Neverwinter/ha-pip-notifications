@@ -6,9 +6,12 @@ from homeassistant import loader
 
 
 async def test_diag(hass):
-    print("\nDIAG recovery_mode", hass.config.recovery_mode, "safe_mode", hass.config.safe_mode)
-    print("DIAG config_dir", hass.config.config_dir)
-    src = inspect.getsource(loader._async_get_custom_components)
-    print("DIAG source:\n" + "\n".join("DIAG| " + line for line in src.splitlines()[:40]))
+    print("\nDIAG config_dir", hass.config.config_dir)
+    print("DIAG names", [n for n in dir(loader) if "custom" in n.lower()])
+    for name in dir(loader):
+        obj = getattr(loader, name)
+        if "custom" in name.lower() and inspect.isfunction(obj):
+            for line in inspect.getsource(obj).splitlines()[:45]:
+                print(f"DIAG {name}| {line}")
     comps = await loader.async_get_custom_components(hass)
     print("DIAG found", sorted(comps))
