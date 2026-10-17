@@ -20,7 +20,9 @@ JPEG = b"\xff\xd8\xff fake jpeg bytes"
 
 
 @pytest.fixture
-async def setup(hass: HomeAssistant):
+async def setup(
+    hass: HomeAssistant, aioclient_mock
+):  # mock first: setup grabs the session
     hass.states.async_set("camera.front", "idle", {"friendly_name": "Front Door"})
     assert await async_setup_component(
         hass,
