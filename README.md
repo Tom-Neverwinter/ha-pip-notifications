@@ -54,9 +54,20 @@ response_variable: shown   # -> {camera, location, timestamp, analysis, delivere
   trusted network/VLAN. Worst case is a fake popup — the app can't do anything else.
 - **Single-threaded listener** with a 5 s socket timeout: an allow-listed host could slow it down,
   a non-allow-listed host is dropped before anything is read.
-- Hardening tested on a real TV: bad/negative/non-numeric lengths, 16 KB header lines, garbage
-  bytes, slowloris, truncated bodies, invalid base64, and a 500×2,000,000 px PNG decompression bomb
-  (subsampled; the listener also survives `OutOfMemoryError`).
+- Hardening tested on a real TV: bad/negative/non-numeric/overflowing lengths, 16 KB header lines,
+  101 headers, garbage bytes, slowloris, truncated bodies, invalid base64, wrong JSON types, 8 MiB
+  deeply-nested JSON (stack overflow → 400), a 500×2,000,000 px PNG decompression bomb (subsampled),
+  auth edge cases (case, prefix/suffix, duplicates, Basic), 300-connection flood from a
+  non-allow-listed host, 400 random fuzz requests, unicode/RTL/emoji text, and 80 rapid popups
+  (memory returns to baseline).
+- Token is excluded from cloud backup **and** device-to-device transfer (`data_extraction_rules.xml`).
+- Not debuggable; config receiver only accepts action-less broadcasts from DUMP holders (adb/system).
+
+## Tests
+- `ha/tests/`: HA integration tests using HA's own harness (Linux only — run in CI):
+  `cd ha && python -m pytest tests` with `pytest-homeassistant-custom-component` installed.
+- CI (`.github/workflows/ci.yml`): HA tests on the latest HA, ruff, bandit, shellcheck, gitleaks over
+  full history, and a clean APK build.
 
 ## Secrets
 Secrets only ever live in their own files, none of which are in this repo:

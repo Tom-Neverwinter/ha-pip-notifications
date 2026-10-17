@@ -41,6 +41,7 @@ import java.text.DateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -104,7 +105,7 @@ public class OverlayService extends Service {
             while (!s.isClosed()) {
                 try (Socket c = s.accept()) {
                     handle(c);
-                } catch (Exception | OutOfMemoryError e) { // one bad request must not kill the listener
+                } catch (Exception | OutOfMemoryError | StackOverflowError e) { // one bad request must not kill the listener
                     if (s.isClosed()) break;
                     Log.w(TAG, "request failed: " + e);
                 }
@@ -136,7 +137,7 @@ public class OverlayService extends Service {
             if (h == null || h.isEmpty()) break;
             int colon = h.indexOf(':');
             if (colon < 0) continue;
-            String name = h.substring(0, colon).trim().toLowerCase();
+            String name = h.substring(0, colon).trim().toLowerCase(Locale.ROOT); // not the TV's locale (Turkish ı)
             String value = h.substring(colon + 1).trim();
             if (name.equals("content-length")) len = Integer.parseInt(value);
             else if (name.equals("authorization")) auth = value;
@@ -167,7 +168,7 @@ public class OverlayService extends Service {
         Popup pop;
         try {
             pop = Popup.parse(new JSONObject(new String(body, StandardCharsets.UTF_8)));
-        } catch (Exception e) {
+        } catch (Exception | StackOverflowError e) { // deeply nested JSON overflows org.json's recursion
             reply(out, 400, "bad json");
             return;
         }

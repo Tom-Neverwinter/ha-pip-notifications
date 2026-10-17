@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ha-tests:
+    name: HA integration tests (Linux, latest HA)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uv venv --python 3.14 && uv pip install pytest-homeassistant-custom-component
+      - run: cd ha && ../.venv/bin/python -c "import homeassistant.const as c; print('HA', c.__version__)"
+      - run: cd ha && ../.venv/bin/python -m pytest tests -v -p no:cacheprovider
+
+  lint:
+    name: ruff, bandit, shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - run: uvx ruff@0.7.4 check ha/custom_components
+      - run: uvx ruff@0.7.4 format --check ha/custom_components
+      - run: uvx bandit@1.7.10 -q -r ha/custom_components
+      - run: uvx --from shellcheck-py@0.10.0.1 shellcheck android/build.sh .githooks/pre-commit
+
+  secrets:
+    name: gitleaks (full history)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 git /repo --no-banner -v
+
+  apk:
+    name: Build APK (throwaway debug key)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;35.0.0" "platforms;android-35" > /dev/null
+      - run: HAPIP_KEYSTORE="$RUNNER_TEMP/ci.keystore" bash android/build.sh
+      - run: '"$ANDROID_HOME/build-tools/35.0.0/aapt2" dump permissions android/build/ha-pip-notifications.apk'

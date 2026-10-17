@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:ignore="MissingLeanbackLauncher"
     package="io.github.tomneverwinter.hapip"
-    android:versionCode="2"
-    android:versionName="0.2.0">
+    android:versionCode="4"
+    android:versionName="0.3.1">
 
     <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35" />
 
@@ -16,7 +18,13 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <application android:label="HA PiP Notifications" android:allowBackup="false">
+    <!-- No launcher/UI on purpose: configured over adb only. -->
+    <application
+        android:label="HA PiP Notifications"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
 
         <service
             android:name=".OverlayService"
