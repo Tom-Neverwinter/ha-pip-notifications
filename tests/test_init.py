@@ -1,6 +1,7 @@
 """Behaviour + safety tests for pip_notifications.show (HA's own test harness, no real network)."""
 
 import asyncio
+import re
 import base64
 from unittest.mock import patch
 
@@ -205,3 +206,55 @@ async def test_analysis_passthrough(hass, setup, aioclient_mock):
     assert all(
         c[2]["analysis"] == "From my own pipeline" for c in aioclient_mock.mock_calls
     )
+
+
+async def test_snapshot_failure_sends_text_only(hass, setup, aioclient_mock):
+    aioclient_mock.post(TV1, text="ok")
+    aioclient_mock.post(TV2, text="ok")
+    ai_calls = []
+
+    async def handler(call):
+        ai_calls.append(call)
+        return {"data": "should not run"}
+
+    ai_service(hass, handler)
+    with patch(
+        "custom_components.pip_notifications.async_get_image",
+        side_effect=HomeAssistantError("WebRTC-only camera"),
+    ):
+        res = await show(hass, location="Porch", ai_task_entity="ai_task.local")
+
+    assert len(res["delivered"]) == 2 and res["has_image"] is False
+    assert all("image" not in c[2] for c in aioclient_mock.mock_calls)
+    assert all(c[2]["camera"] == "Front Door" for c in aioclient_mock.mock_calls)
+    assert not ai_calls  # nothing to analyse
+
+
+async def test_has_image_true(hass, setup, aioclient_mock):
+    aioclient_mock.post(TV1, text="ok")
+    aioclient_mock.post(TV2, text="ok")
+    assert (await show(hass))["has_image"] is True
+
+
+async def test_custom_time_format(hass, aioclient_mock):
+    hass.states.async_set("camera.front", "idle")
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {"token": TOKEN, "tvs": {"tv": "192.0.2.10"}, "time_format": "%H:%M"}},
+    )
+    aioclient_mock.post(TV1, text="ok")
+    with patch(
+        "custom_components.pip_notifications.async_get_image",
+        return_value=Image("image/jpeg", JPEG),
+    ):
+        res = await show(hass)
+    assert re.fullmatch(r"\d\d:\d\d", res["timestamp"])
+
+
+async def test_blank_ai_entity_means_no_ai(hass, setup, aioclient_mock):
+    aioclient_mock.post(TV1, text="ok")
+    aioclient_mock.post(TV2, text="ok")
+    res = await show(hass, ai_task_entity="", name="", tvs=[])  # blueprint defaults
+    assert res["analysis"] == "" and len(res["delivered"]) == 2
+    assert res["camera"] == "Front Door" and len(aioclient_mock.mock_calls) == 2

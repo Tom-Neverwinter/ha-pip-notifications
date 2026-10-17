@@ -15,7 +15,7 @@ from homeassistant.core import (
     ServiceResponse,
     SupportsResponse,
 )
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
@@ -24,6 +24,7 @@ from homeassistant.util import dt as dt_util
 DOMAIN = "pip_notifications"
 PORT = 7979
 AI_TIMEOUT = 60  # s; a hung AI provider must not block the automation
+DEFAULT_TIME_FORMAT = "%-I:%M:%S %p · %a %b %-d"  # strftime; e.g. "%H:%M:%S · %a %d %b"
 DEFAULT_PROMPT = (
     "In one short sentence, describe who or what is at the door "
     "and what they are doing. Do not guess identities."
@@ -36,6 +37,7 @@ CONFIG_SCHEMA = vol.Schema(
             {
                 vol.Required("token"): vol.All(cv.string, vol.Length(min=16)),
                 vol.Required("tvs"): {cv.slug: cv.string},
+                vol.Optional("time_format", default=DEFAULT_TIME_FORMAT): cv.string,
             }
         )
     },
@@ -49,7 +51,8 @@ SHOW_SCHEMA = vol.Schema(
         vol.Optional("name"): cv.string,
         vol.Optional("location", default=""): cv.string,
         vol.Optional("analysis", default=""): cv.string,
-        vol.Optional("ai_task_entity"): cv.entity_id,
+        # "" = no AI (blueprints pass empty optional inputs as "")
+        vol.Optional("ai_task_entity"): vol.Any("", cv.entity_id),
         vol.Optional("ai_prompt", default=DEFAULT_PROMPT): cv.string,
         vol.Optional("duration", default=5): vol.All(
             vol.Coerce(int), vol.Range(min=3, max=120)
@@ -89,20 +92,26 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             raise ServiceValidationError(f"Unknown TV(s): {', '.join(unknown)}")
 
         camera = d["camera"]
-        image = await async_get_image(hass, camera)
+        try:
+            image = await async_get_image(hass, camera)
+        except HomeAssistantError as err:
+            # e.g. WebRTC-only Nest cameras, offline cameras: still alert, text only.
+            _LOGGER.warning("No snapshot from %s (%s); sending text only", camera, err)
+            image = None
         state = hass.states.get(camera)
         payload = {
             "camera": d.get("name") or (state.name if state else camera),
             "location": d["location"],
-            "timestamp": dt_util.now().strftime("%-I:%M:%S %p · %a %b %-d"),
+            "timestamp": dt_util.now().strftime(conf["time_format"]),
             "analysis": d["analysis"],
             "duration": d["duration"],
-            "image": base64.b64encode(image.content).decode(),
         }
+        if image:
+            payload["image"] = base64.b64encode(image.content).decode()
         delivered = await push_all(tvs, payload)
 
         # Popup goes up first; AI (often slow) then replaces it with the analysed one.
-        if ai := d.get("ai_task_entity"):
+        if (ai := d.get("ai_task_entity")) and image:
             try:
                 async with asyncio.timeout(AI_TIMEOUT):
                     res = await hass.services.async_call(
@@ -130,6 +139,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
         result = {k: v for k, v in payload.items() if k != "image"} | {
             "entity_id": camera,
+            "has_image": image is not None,
             "delivered": delivered,
         }
         hass.bus.async_fire(f"{DOMAIN}_shown", result)

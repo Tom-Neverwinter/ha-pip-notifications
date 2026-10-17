@@ -1,0 +1,119 @@
+blueprint:
+  name: Camera event → TV popup (HA PiP Notifications)
+  description: >-
+    Show a camera snapshot on your Android TV / Google TV when a motion, person or doorbell
+    sensor turns on, or when an event entity fires (for example a doorbell press). Works with any
+    camera integration: Blink, Frigate, Nest, Ring, Reolink, UniFi Protect, Blue Iris, generic
+    cameras… Optionally adds a sensor value (shown in your own units, °C or °F) and a one-line AI
+    description. Turn the automation off to silence it.
+  domain: automation
+  source_url: https://github.com/Tom-Neverwinter/ha-pip-notifications/blob/main/examples/blueprints/camera_popup.yaml
+  input:
+    trigger_entity:
+      name: Trigger
+      description: >-
+        A motion / person / doorbell binary sensor (fires when it turns on), or an event entity
+        such as a doorbell press (fires on every new event).
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+            - domain: event
+    camera:
+      name: Camera
+      selector:
+        entity:
+          filter:
+            - domain: camera
+    title:
+      name: Title (optional)
+      description: Defaults to the camera's name.
+      default: ""
+      selector:
+        text:
+    location:
+      name: Location (optional)
+      default: ""
+      selector:
+        text:
+    extra_sensor:
+      name: Extra sensor (optional)
+      description: >-
+        Shown next to the location with its own unit, e.g. an outdoor temperature sensor. Home
+        Assistant already converts it to your unit system (°C or °F).
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+    tvs:
+      name: TVs (optional)
+      description: TV names from your pip_notifications config. Leave empty for all TVs.
+      default: []
+      selector:
+        text:
+          multiple: true
+    ai_task_entity:
+      name: AI Task entity (optional)
+      description: Adds a one-line AI description of the snapshot (shown when it arrives).
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: ai_task
+    duration:
+      name: Popup duration
+      default: 5
+      selector:
+        number:
+          min: 3
+          max: 120
+          unit_of_measurement: s
+    cooldown:
+      name: Cooldown
+      description: Minimum time between popups (also spares battery cameras).
+      default: 120
+      selector:
+        number:
+          min: 0
+          max: 3600
+          unit_of_measurement: s
+
+mode: single
+max_exceeded: silent
+
+triggers:
+  - trigger: state
+    entity_id: !input trigger_entity
+
+variables:
+  location_input: !input location
+  extra: !input extra_sensor
+
+conditions:
+  # binary_sensor: off -> on only. event: any new event (not startup/unavailable changes).
+  - condition: template
+    value_template: >-
+      {% set f, t = trigger.from_state, trigger.to_state %}
+      {{ f is not none and t is not none
+         and f.state not in ['unavailable', 'unknown']
+         and t.state not in ['unavailable', 'unknown']
+         and (trigger.entity_id.startswith('event.') or (f.state == 'off' and t.state == 'on')) }}
+
+actions:
+  - action: pip_notifications.show
+    continue_on_error: true
+    data:
+      camera: !input camera
+      name: !input title
+      tvs: !input tvs
+      ai_task_entity: !input ai_task_entity
+      duration: !input duration
+      location: >-
+        {% set value = '' %}
+        {% if extra and states(extra) not in ['unknown', 'unavailable'] %}
+          {% set value = (states(extra) ~ ' ' ~ (state_attr(extra, 'unit_of_measurement') or '')) | trim %}
+        {% endif %}
+        {{ [location_input, value] | select | join(' · ') }}
+  - delay:
+      seconds: !input cooldown

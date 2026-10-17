@@ -13,7 +13,7 @@ Show a camera snapshot as a small picture-in-picture popup on your Android TV / 
 something happens (doorbell, motion, …), with an optional one-line AI description.
 Two small pieces, no third-party libraries: a Home Assistant integration and a tiny TV app.
 
-**Status:** early (0.3.x). Running on one Google TV (Android 14) with Home Assistant 2026.10; tested
+**Status:** early (0.4.x). Running on one Google TV (Android 14) with Home Assistant 2026.10; tested
 there and in CI on the latest Home Assistant.
 Options may still change between minor versions.
 
@@ -28,8 +28,14 @@ Options may still change between minor versions.
   you have set up in Home Assistant. The popup appears immediately, then updates with the AI's
   description. If the AI is slow (60 s limit) or fails, you still get the plain popup.
 - Or pass your **own text** (`analysis:`) from any other system.
-- **Pipe results onward:** the action returns what was shown (title, location, time, analysis, which
-  TVs received it) and fires a `pip_notifications_shown` event for other automations.
+- **Pipe results onward:** the action returns what was shown (title, location, time, analysis,
+  whether there was an image, which TVs received it) and fires a `pip_notifications_shown` event.
+- **Still alert when there's no picture:** if the camera can't give a snapshot (offline, WebRTC-only
+  Nest, cloud hiccup), you get a text-only popup instead of nothing.
+- **Your units and time format:** add any sensor (e.g. outdoor temperature) and it's shown in your
+  own units (°C or °F, as set in Home Assistant); pick 12- or 24-hour time with `time_format`.
+- **Works with any camera integration** — Blink, Frigate, Nest, Ring, Reolink, UniFi Protect,
+  Blue Iris, generic RTSP/ONVIF — via the [example blueprint](#examples).
 
 ## What it can't do
 - **No live video.** It shows still snapshots, not a camera stream.
@@ -46,8 +52,9 @@ Options may still change between minor versions.
 - **Doesn't recognise people.** The default AI prompt asks for a short description and tells the AI
   not to guess identities; how good the description is depends on your AI provider.
 - **Snapshot freshness depends on your camera integration** (battery cameras such as Blink may
-  deliver the last motion thumbnail, a little delayed). Size/position of the popup aren't
-  configurable yet.
+  deliver the last motion thumbnail, a little delayed; some cameras give no snapshot at all — see
+  [CAMERAS.md](examples/CAMERAS.md)). Size/position of the popup aren't configurable yet, and
+  weekday/month names in the time are English.
 
 ## Install
 
@@ -69,6 +76,8 @@ pip_notifications_token: "<long random token>"
 ```
 and add to `configuration.yaml`: `pip_notifications: !include pip_notifications/config.yaml`, then
 restart. Generate a token with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+Optional in `config.yaml`: `time_format: "%H:%M:%S · %a %d %b"` for 24-hour time (default
+`3:05:51 PM · Sat Oct 17`).
 
 ### TV app
 Build it (needs JDK 17 and Android SDK build-tools 35 + platform 35; no Gradle):
@@ -94,9 +103,22 @@ data:
   location: Porch           # optional
   duration: 5               # optional, 3-120 s
   ai_task_entity: ai_task.my_provider   # optional
-response_variable: shown    # {camera, location, timestamp, analysis, duration, delivered, entity_id}
+response_variable: shown    # {camera, location, timestamp, analysis, duration, has_image, delivered, entity_id}
 ```
 Typical automation: motion/doorbell trigger → `pip_notifications.show` → your TTS → a cooldown delay.
+
+## Examples
+- **Blueprint** — *Camera event → TV popup*: pick a trigger (motion/person/doorbell binary sensor or
+  a doorbell event entity), a camera, and optionally a title, location, extra sensor (°C/°F), AI
+  entity, duration and cooldown.
+
+  [![Open your Home Assistant instance and show the blueprint import dialog.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FTom-Neverwinter%2Fha-pip-notifications%2Fblob%2Fmain%2Fexamples%2Fblueprints%2Fcamera_popup.yaml)
+
+  Or copy [`examples/blueprints/camera_popup.yaml`](examples/blueprints/camera_popup.yaml) to
+  `/config/blueprints/automation/`.
+- **[CAMERAS.md](examples/CAMERAS.md)** — which trigger and camera to pick for Blink, Frigate, Nest,
+  Ring, Reolink, UniFi Protect, Blue Iris and generic cameras, units, time formats, and a plain
+  YAML automation.
 
 ## Security
 **TV app**
@@ -122,12 +144,13 @@ unicode/RTL/emoji text, and 80 rapid popups (memory returns to baseline). See CI
 checks.
 
 ## Development
-- `tests/`: Home Assistant integration tests using HA's own test harness (Linux only):
+- `tests/`: Home Assistant tests using HA's own test harness (Linux only) — the action, and the
+  blueprint loaded exactly as users load it:
   `pip install pytest-homeassistant-custom-component PyTurboJPEG && python -m pytest tests`.
 - CI: hassfest, HACS validation, version consistency, HA tests on the latest Home Assistant,
   ruff, bandit, shellcheck, gitleaks over the full history, and a clean APK build. Runs weekly too,
   to catch breakage from new Home Assistant releases.
-- `manifest.json` and the APK share one version; release tags must match it (`v0.3.1`).
+- `manifest.json` and the APK share one version; release tags must match it (e.g. `v0.4.0`).
 - Secrets live only in their own files. `.gitignore` excludes secret-looking files and
   `.githooks/pre-commit` blocks commits with tokens, private IPs or keys — enable it once per clone:
   `git config core.hooksPath .githooks`.
