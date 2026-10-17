@@ -45,6 +45,8 @@ Options may still change between minor versions.
 - **No interaction:** no buttons, no dismiss, no "unlock door". It's display-only, on purpose.
 - **No sound.** Pair it with your own TTS/speaker automation if you want an announcement.
 - **One popup at a time.** A new popup replaces the current one; there is no queue or history.
+- **Not instant after a TV reboot:** the app restarts on its own, but only once Android gets round to
+  it (several minutes on a busy TV). Popups sent in that window are lost.
 - **No on-screen settings** and **not in the Play Store**: you sideload the app and configure it once
   with `adb` (needs Developer options on the TV).
 - **YAML setup only** in Home Assistant (no UI config flow yet).
@@ -91,8 +93,10 @@ adb -s <tv> shell appops set io.github.tomneverwinter.hapip SYSTEM_ALERT_WINDOW 
 adb -s <tv> shell am broadcast -f 32 -n io.github.tomneverwinter.hapip/.ConfigReceiver \
     --es token "<same token>" --es allow <Home Assistant IP>
 ```
-The app has no icon in the launcher; it runs as a small background service and starts again after
-the TV reboots. The APK is signed with your local Android debug key; updates must use the same key.
+The app has no icon in the launcher; it runs as a small background service and starts again by itself
+after the TV reboots — **this can take several minutes** (Android TV notifies apps one by one after boot;
+~5 min on the tested Google TV), so popups sent right after a reboot are missed. The APK is signed with your
+local Android debug key; updates must use the same key.
 
 ## Use
 ```yaml
