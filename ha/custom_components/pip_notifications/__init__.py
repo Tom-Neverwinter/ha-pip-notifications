@@ -122,7 +122,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                         blocking=True,
                         return_response=True,
                     )
-                payload["analysis"] = str(res.get("data", "")).strip()
+                # New dict: never mutate a payload that was already handed to a send.
+                payload = {**payload, "analysis": str(res.get("data", "")).strip()}
                 delivered = await push_all(tvs, payload)
             except Exception as err:  # noqa: BLE001 - AI failure never blocks the alert
                 _LOGGER.warning("AI analysis failed: %s", err)
