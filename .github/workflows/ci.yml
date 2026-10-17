@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
-      - run: uv venv --python 3.14 && uv pip install pytest-homeassistant-custom-component
+      - run: uv venv --python 3.14 && uv pip install pytest-homeassistant-custom-component PyTurboJPEG
       - run: cd ha && ../.venv/bin/python -c "import homeassistant.const as c; print('HA', c.__version__)"
       - run: cd ha && ../.venv/bin/python -m pytest tests -v -p no:cacheprovider
 
