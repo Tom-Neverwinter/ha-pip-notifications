@@ -4,5 +4,9 @@ token: !secret pip_notifications_token   # resolved from /config/pip_notificatio
 tvs:
   living_room: 192.0.2.10          # TV IP (192.0.2.x = documentation placeholder)
   # bedroom: 192.0.2.11
+  # A TV with its own token (revoke it alone by changing/removing this token):
+  # guest_room:
+  #   host: 192.0.2.12
+  #   token: !secret pip_notifications_guest_room_token
 # Optional: popup time format (Python strftime). Default "%-I:%M:%S %p · %a %b %-d" (3:05:51 PM · Sat Oct 17)
 # time_format: "%H:%M:%S · %a %d %b"   # 24-hour: 15:05:51 · Sat 17 Oct

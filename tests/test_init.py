@@ -68,6 +68,59 @@ async def test_short_token_rejected(hass: HomeAssistant, caplog):
     assert not hass.services.has_service(DOMAIN, "show")
 
 
+async def test_per_tv_token(hass: HomeAssistant, aioclient_mock):
+    own = "o" * 32
+    hass.states.async_set("camera.front", "idle")
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {
+            DOMAIN: {
+                "token": TOKEN,
+                "tvs": {
+                    "living_room": "192.0.2.10",
+                    "kitchen": {"host": "192.0.2.11", "token": own},
+                },
+            }
+        },
+    )
+    aioclient_mock.post(TV1, text="ok")
+    aioclient_mock.post(TV2, text="ok")
+    with patch(
+        "custom_components.pip_notifications.async_get_image",
+        return_value=Image("image/jpeg", JPEG),
+    ):
+        res = await show(hass)
+    auth = {
+        str(url): h["Authorization"] for _m, url, _p, h in aioclient_mock.mock_calls
+    }
+    assert auth == {TV1: f"Bearer {TOKEN}", TV2: f"Bearer {own}"}
+    assert own not in str(res)
+
+
+async def test_per_tv_tokens_without_shared_token(hass: HomeAssistant):
+    assert await async_setup_component(
+        hass,
+        DOMAIN,
+        {DOMAIN: {"tvs": {"tv": {"host": "192.0.2.10", "token": TOKEN}}}},
+    )
+    assert hass.services.has_service(DOMAIN, "show")
+
+
+@pytest.mark.parametrize(
+    "tvs",
+    [
+        {"tv": "192.0.2.10"},  # no shared token to fall back on
+        {"tv": {"host": "192.0.2.10"}},
+        {"tv": {"host": "192.0.2.10", "token": "short"}},
+    ],
+)
+async def test_tv_without_usable_token_rejected(hass: HomeAssistant, caplog, tvs):
+    assert not await async_setup_component(hass, DOMAIN, {DOMAIN: {"tvs": tvs}})
+    assert "Invalid config for 'pip_notifications'" in caplog.text
+    assert not hass.services.has_service(DOMAIN, "show")
+
+
 async def test_valid_config_registers_service(hass: HomeAssistant, setup):
     assert hass.services.has_service(DOMAIN, "show")
 

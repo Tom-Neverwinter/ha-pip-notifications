@@ -31,14 +31,37 @@ DEFAULT_PROMPT = (
 )
 _LOGGER = logging.getLogger(__name__)
 
+TOKEN = vol.All(cv.string, vol.Length(min=16))
+# A TV is either its IP (uses the shared token) or {host, token} with a token of its own,
+# so one TV can be revoked by changing only its token.
+TV = vol.Any(
+    cv.string,
+    vol.Schema({vol.Required("host"): cv.string, vol.Optional("token"): TOKEN}),
+)
+
+
+def _per_tv_tokens(conf: dict) -> dict:
+    """Resolve every TV to {host, token}; each needs its own or the shared token."""
+    tvs = {}
+    for name, tv in conf["tvs"].items():
+        tv = tv if isinstance(tv, dict) else {"host": tv}
+        if not (token := tv.get("token", conf.get("token"))):
+            raise vol.Invalid(f"TV {name} has no token and there is no shared token")
+        tvs[name] = {"host": tv["host"], "token": token}
+    return {**conf, "tvs": tvs}
+
+
 CONFIG_SCHEMA = vol.Schema(
     {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required("token"): vol.All(cv.string, vol.Length(min=16)),
-                vol.Required("tvs"): {cv.slug: cv.string},
-                vol.Optional("time_format", default=DEFAULT_TIME_FORMAT): cv.string,
-            }
+        DOMAIN: vol.All(
+            vol.Schema(
+                {
+                    vol.Optional("token"): TOKEN,
+                    vol.Required("tvs"): {cv.slug: TV},
+                    vol.Optional("time_format", default=DEFAULT_TIME_FORMAT): cv.string,
+                }
+            ),
+            _per_tv_tokens,
         )
     },
     extra=vol.ALLOW_EXTRA,
@@ -64,14 +87,13 @@ SHOW_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     conf = config[DOMAIN]
     session = async_get_clientsession(hass)
-    headers = {"Authorization": f"Bearer {conf['token']}"}
 
     async def push(tv: str, payload: dict) -> bool:
         try:
             async with session.post(
-                f"http://{conf['tvs'][tv]}:{PORT}/notify",
+                f"http://{conf['tvs'][tv]['host']}:{PORT}/notify",
                 json=payload,
-                headers=headers,
+                headers={"Authorization": f"Bearer {conf['tvs'][tv]['token']}"},
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as r:
                 if r.status == 200:

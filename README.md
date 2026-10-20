@@ -78,6 +78,18 @@ pip_notifications_token: "<long random token>"
 ```
 and add to `configuration.yaml`: `pip_notifications: !include pip_notifications/config.yaml`, then
 restart. Generate a token with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+
+**One token per TV (optional):** give a TV its own token so you can revoke it without touching
+the others. TVs without one use the shared `token` (which is then optional if every TV has its own):
+```yaml
+tvs:
+  living_room: 192.0.2.10              # shared token
+  guest_room:
+    host: 192.0.2.12
+    token: !secret pip_notifications_guest_room_token
+```
+To revoke a TV, remove it (or its token) from `config.yaml` and restart, or send it a new token over
+adb so the old one stops working on the TV.
 Optional in `config.yaml`: `time_format: "%H:%M:%S · %a %d %b"` for 24-hour time (default
 `3:05:51 PM · Sat Oct 17`).
 
